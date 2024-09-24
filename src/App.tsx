@@ -1,20 +1,16 @@
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
+import { Index } from "./pages/index";
+import { CollectData } from "./pages/collect_data";
+import { Training } from "./pages/training";
 
-function App() {
-  const [count, setCount] = useState(0);
-
-  async function increment(currentCount: number) {
-    setCount(await invoke("count_increment", { currentCount }));
-  }
-
+export default function App() {
   return (
-    <div className="flex flex-col items-center h-screen justify-center">
-      <Button onClick={() => increment(count)}>Click me!</Button>
-      <h1>{count}</h1>
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/collect_data" element={<CollectData />} />
+        <Route path="/training" element={<Training />} />
+      </Routes>
+    </Router>
   );
 }
-
-export default App;
