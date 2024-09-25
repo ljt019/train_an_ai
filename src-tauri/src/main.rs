@@ -4,7 +4,6 @@ use base64;
 use std::fs;
 
 mod ai;
-mod dataset;
 
 // Train an ML model with the drawings (CNN using candle)
 #[tauri::command]
