@@ -4,11 +4,12 @@ use base64;
 use std::fs;
 
 mod ai;
+mod dataset;
 
 // Train an ML model with the drawings (CNN using candle)
 #[tauri::command]
-fn train() -> Result<(), String> {
-    ai::train().map_err(|e| e.to_string())
+fn train() {
+    println!("Training the model...");
 }
 
 #[tauri::command]

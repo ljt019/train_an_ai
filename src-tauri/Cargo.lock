@@ -268,8 +268,9 @@ dependencies = [
 
 [[package]]
 name = "candle-core"
-version = "0.7.1"
-source = "git+https://github.com/huggingface/candle.git#d01207dbf3fb0ad614e7915c8f5706fbc09902fb"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f81301f3a38fd17d1dd52479f01c2217ad77ae9a53e07f4db43fccba2db8a4d0"
 dependencies = [
  "byteorder",
  "gemm",
@@ -284,6 +285,21 @@ dependencies = [
  "thiserror",
  "yoke",
  "zip",
+]
+
+[[package]]
+name = "candle-nn"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89b29776b10a645a4d561c8178b19a5845e1c7b8207ba4f9068c5a320c124f94"
+dependencies = [
+ "candle-core",
+ "half",
+ "num-traits",
+ "rayon",
+ "safetensors",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -1871,6 +1887,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mnist"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06eb594c0749d3a505304db3b7a9c9891630d32daad059e81bfd0d51846f95c"
+dependencies = [
+ "byteorder",
+ "log",
+]
+
+[[package]]
 name = "ndk"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2004,8 +2030,10 @@ version = "0.1.0"
 dependencies = [
  "base64 0.13.1",
  "candle-core",
+ "candle-nn",
  "chrono",
  "image",
+ "mnist",
  "serde",
  "serde_json",
  "tauri",
