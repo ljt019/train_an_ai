@@ -73,7 +73,7 @@ The output layer of the CNN provides the final classification result. For a digi
 
 3. **Pooling Layer**
 
-   - Reduces the dimensionality of the feature maps while retaining important information.
+   - Reduces the dimensionality (storage space) of the feature maps while retaining important information.
 
 4. **Convolutional Layer**
 
@@ -81,7 +81,7 @@ The output layer of the CNN provides the final classification result. For a digi
 
 5. **Pooling Layer**
 
-   - Again reduces the dimensionality of the feature maps.
+   - Again reduces the dimensionality (storage space) of the feature maps.
 
 6. **Fully Connected Layer**
 
