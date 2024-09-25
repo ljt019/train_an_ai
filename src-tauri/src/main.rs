@@ -3,6 +3,14 @@
 use base64;
 use std::fs;
 
+mod ai;
+
+// Train an ML model with the drawings (CNN using candle)
+#[tauri::command]
+fn train() -> Result<(), String> {
+    ai::train().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn save_drawing(image_data: String, symbol: String) -> Result<(), String> {
     // Remove the "data:image/png;base64," prefix
@@ -26,7 +34,7 @@ fn save_drawing(image_data: String, symbol: String) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![save_drawing])
+        .invoke_handler(tauri::generate_handler![save_drawing, train])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
