@@ -61,13 +61,35 @@ The final fully connected layer outputs a vector of probabilities, one for each 
 
 The output layer of the CNN provides the final classification result. For a digit recognition task, this layer would have 10 neurons, one for each digit from 0 to 9. The neuron with the highest activation represents the predicted digit. (if you were to include math symbols you would need 15 neurons).
 
-###### Full Structure
+## Full Structure of the Neural Network
 
-- Input
-- Convolutional
-- Pooling
-- Convolutional
-- Pooling
-- Fully Connected
-- Fully Connected
-- Output
+1. **Input Layer**
+
+   - The initial layer that takes in the raw input data (e.g., an image).
+
+2. **Convolutional Layer**
+
+   - Applies convolution operations to extract features from the input data.
+
+3. **Pooling Layer**
+
+   - Reduces the dimensionality of the feature maps while retaining important information.
+
+4. **Convolutional Layer**
+
+   - Further extracts features from the pooled feature maps.
+
+5. **Pooling Layer**
+
+   - Again reduces the dimensionality of the feature maps.
+
+6. **Fully Connected Layer**
+
+   - Each neuron is connected to every neuron in the previous layer, allowing the network to learn complex patterns.
+
+7. **Fully Connected Layer**
+
+   - Another layer of fully connected neurons to further refine the learned patterns.
+
+8. **Output Layer**
+   - Produces the final classification result, typically using a softmax function to output probabilities for each class.
