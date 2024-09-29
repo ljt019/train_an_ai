@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/tauri"; // Correct import path
 
-export function Training() {
+export default function Training() {
   const handleTrain = async () => {
     try {
       await invoke("train");

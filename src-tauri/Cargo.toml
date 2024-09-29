@@ -20,6 +20,8 @@ image = "0.24"
 candle-nn = "0.7.0"
 candle-core = "0.7.0"
 mnist = "0.6.0"
+ndarray = "0.16.1"
+imageproc = "0.23"
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
