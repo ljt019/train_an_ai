@@ -39,9 +39,28 @@ fn save_drawing(image_data: String, symbol: String) -> Result<(), String> {
 }
 
 #[command]
-fn apply_conv_filter(image_path: String) -> Result<String, String> {
+fn apply_conv_filter() -> Result<String, String> {
+    // Log the image path
+    //println!("Received image path: {}", image_path);
+
+    let image_path = "drawings/3.png".to_string();
+
+    // Resolve the absolute path
+    let absolute_image_path = std::fs::canonicalize(&image_path)
+        .map_err(|e| format!("Failed to resolve absolute path: {}", e))?;
+    println!("Absolute image path: {}", absolute_image_path.display());
+
+    // Check if the file exists
+    if !absolute_image_path.exists() {
+        return Err(format!(
+            "Image file does not exist: {}",
+            absolute_image_path.display()
+        ));
+    }
+
     // Load the image
-    let img = image::open(&image_path).map_err(|e| e.to_string())?;
+    let img =
+        image::open(&absolute_image_path).map_err(|e| format!("Failed to open image: {}", e))?;
 
     // Convert to grayscale
     let gray_img: ImageBuffer<Luma<u8>, Vec<u8>> = img.to_luma8();
@@ -64,7 +83,9 @@ fn apply_conv_filter(image_path: String) -> Result<String, String> {
         });
 
     // Create the directory if it doesn't exist
-    fs::create_dir_all("conv_layers").map_err(|e| e.to_string())?;
+    let conv_dir = "processed_drawings";
+    fs::create_dir_all(conv_dir)
+        .map_err(|e| format!("Failed to create directory {}: {}", conv_dir, e))?;
 
     // Generate the filename
     let filename = Path::new(&image_path)
@@ -73,23 +94,27 @@ fn apply_conv_filter(image_path: String) -> Result<String, String> {
         .to_str()
         .ok_or_else(|| "Invalid filename".to_string())?
         .to_string();
-    let conv_filename = format!("conv_layers/{}_conv.png", filename);
+    let conv_filename = format!("{}/{}_conv.png", conv_dir, filename);
 
     // Save the processed image
-    conv_img.save(&conv_filename).map_err(|e| e.to_string())?;
+    conv_img
+        .save(&conv_filename)
+        .map_err(|e| format!("Failed to save image: {}", e))?;
 
     // Get the absolute path of the processed image
-    let conv_filepath = std::fs::canonicalize(&conv_filename).map_err(|e| e.to_string())?;
+    let conv_filepath =
+        "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/3_conv.png"
+            .to_string();
 
-    println!("Applied convolution filter: {}", conv_filepath.display());
-    Ok(conv_filepath
-        .to_str()
-        .ok_or("Failed to convert path to string")?
-        .to_string())
+    println!("Applied convolution filter: {}", conv_filepath);
+
+    Ok(conv_filepath)
 }
 
 #[command]
-fn apply_pooling_filter(image_path: String) -> Result<String, String> {
+fn apply_pooling_filter() -> Result<String, String> {
+    let image_path = "processed_drawings/3_conv.png".to_string();
+
     // Load the image
     let img = image::open(&image_path).map_err(|e| e.to_string())?;
 
@@ -104,28 +129,21 @@ fn apply_pooling_filter(image_path: String) -> Result<String, String> {
     let pooled_img = max_pooling(&gray_img, pool_size, stride)?;
 
     // Create the directory if it doesn't exist
-    fs::create_dir_all("pool_layers").map_err(|e| e.to_string())?;
+    fs::create_dir_all("processed_drawings").map_err(|e| e.to_string())?;
 
-    // Generate the filename
-    let filename = Path::new(&image_path)
-        .file_stem()
-        .ok_or_else(|| "Invalid image path".to_string())?
-        .to_str()
-        .ok_or_else(|| "Invalid filename".to_string())?
-        .to_string();
-    let pool_filename = format!("pool_layers/{}_pool.png", filename);
+    // create filename
+    let pool_filename = "processed_drawings/3_pool.png".to_string();
 
     // Save the processed image
     pooled_img.save(&pool_filename).map_err(|e| e.to_string())?;
 
     // Get the absolute path of the processed image
-    let pool_filepath = std::fs::canonicalize(&pool_filename).map_err(|e| e.to_string())?;
+    let pool_filepath =
+        "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/3_pool.png"
+            .to_string();
 
-    println!("Applied pooling filter: {}", pool_filepath.display());
-    Ok(pool_filepath
-        .to_str()
-        .ok_or("Failed to convert path to string")?
-        .to_string())
+    println!("Applied pooling filter: {}", pool_filepath);
+    Ok(pool_filepath)
 }
 
 #[command]

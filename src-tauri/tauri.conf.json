@@ -15,6 +15,12 @@
       "shell": {
         "all": false,
         "open": true
+      },
+      "fs": {
+        "all": true,
+        "scope": [
+          "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/**"
+        ]
       }
     },
     "windows": [
