@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { invoke } from "@tauri-apps/api/tauri";
 import { readBinaryFile } from "@tauri-apps/api/fs";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartData,
+} from "chart.js";
 
 function convertToBase64(buffer: Uint8Array): string {
   let binary = "";
@@ -157,64 +168,88 @@ export function PoolingLayer({ image_path }: LayerProps) {
   );
 }
 
-export function FullyConnectedLayer({ image_path }: LayerProps) {
-  const [processedImage, setProcessedImage] = useState<string>("");
-  const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+export function FullyConnectedLayer() {
+  const [chartData, setChartData] = useState<
+    ChartData<"bar", number[], string>
+  >({
+    labels: [],
+    datasets: [{ data: [] }],
+  });
 
   useEffect(() => {
-    const processImage = async () => {
-      try {
-        // Invoke the backend command to apply fully connected filter
-        const fcFilename: string = await invoke(
-          "apply_fully_connected_filter",
-          { image_path }
-        );
+    const labels = Array.from({ length: 10 }, (_, i) => i.toString());
+    const data = labels.map((label) =>
+      label === "3" ? 0.9 : Math.random() * 0.1
+    );
 
-        // Use the absolute path returned by the backend directly
-        const absolutePath = fcFilename;
+    setChartData({
+      labels,
+      datasets: [
+        {
+          label: "Probability",
+          data,
+          backgroundColor: "rgba(75, 192, 192, 0.6)",
+          borderColor: "rgba(75, 192, 192, 1)",
+          borderWidth: 1,
+        },
+      ],
+    });
+  }, []);
 
-        // Read the processed image as binary data
-        const binaryData = await readBinaryFile(absolutePath);
-
-        // Convert binary data to Base64
-        const base64Data = convertToBase64(binaryData);
-
-        // Set the processed image as a data URL
-        setProcessedImage(`data:image/png;base64,${base64Data}`);
-      } catch (error) {
-        console.error("Error processing fully connected layer:", error);
-        setErrorOccurred(true);
-      }
-    };
-
-    processImage();
-  }, [image_path]);
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+      title: {
+        display: true,
+        text: "CNN Output Probabilities",
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 1,
+        title: {
+          display: true,
+          text: "Probability",
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text: "Digit",
+        },
+      },
+    },
+  };
 
   return (
-    <Card>
-      <CardContent className="p-4">
+    <Card className="w-full max-w-3xl mx-auto">
+      <CardContent className="p-6">
+        <h2 className="text-2xl font-bold mb-4">
+          Fully Connected Layer Output
+        </h2>
         <p className="mb-4">
-          The fully connected layer is like the brain making a final decision.
-          It takes the information processed from the previous layers and uses
-          it to decide what the image represents. The convolutional layers
-          simplified the images to important shapes and information, and the
-          pooling layers reduced the image size. This is crucial for AI models
-          trained on larger datasets, as smaller images reduce both the
-          resources needed for training and the training time.
+          This visualization represents the output of the fully connected layer
+          in our Convolutional Neural Network (CNN). Each bar shows the
+          probability that the input image belongs to a particular digit class
+          (0-9). Since we haven't trained our model yet, this is just a
+          demonstration.
         </p>
-        {processedImage ? (
-          <img
-            src={processedImage}
-            alt="Fully Connected Layer"
-            className="rounded-lg mx-auto"
-          />
-        ) : (
-          <p>
-            {errorOccurred
-              ? "An error occurred while processing the image."
-              : "Processing fully connected layer..."}
-          </p>
-        )}
+        <div className="h-64">
+          <Bar options={options} data={chartData} />
+        </div>
       </CardContent>
     </Card>
   );

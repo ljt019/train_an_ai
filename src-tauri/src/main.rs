@@ -7,6 +7,8 @@ use std::fs;
 use std::path::Path;
 use tauri::command;
 
+mod ai;
+
 // Define Tauri commands
 
 #[command]
@@ -147,39 +149,33 @@ fn apply_pooling_filter() -> Result<String, String> {
 }
 
 #[command]
-fn apply_fully_connected_filter(image_path: String) -> Result<String, String> {
+fn apply_fully_connected_filter() -> Result<String, String> {
     // For visualization purposes, we'll simulate the fully connected layer
     // by applying a brightness adjustment.
+
+    let image_path = "processed_drawings/3_pool.png".to_string();
 
     // Load the image
     let img = image::open(&image_path).map_err(|e| e.to_string())?;
 
     // Apply brightness increase
-    let bright_img = img.brighten(50); // Increase brightness by 50
+    let bright_img = img.brighten(25); // Increase brightness by 50
 
     // Create the directory if it doesn't exist
-    fs::create_dir_all("fc_layers").map_err(|e| e.to_string())?;
+    fs::create_dir_all("processed_drawings").map_err(|e| e.to_string())?;
 
-    // Generate the filename
-    let filename = Path::new(&image_path)
-        .file_stem()
-        .ok_or_else(|| "Invalid image path".to_string())?
-        .to_str()
-        .ok_or_else(|| "Invalid filename".to_string())?
-        .to_string();
-    let fc_filename = format!("fc_layers/{}_fc.png", filename);
+    let fc_filename = "processed_drawings/3_fc.png";
 
     // Save the processed image
     bright_img.save(&fc_filename).map_err(|e| e.to_string())?;
 
     // Get the absolute path of the processed image
-    let fc_filepath = std::fs::canonicalize(&fc_filename).map_err(|e| e.to_string())?;
+    let fc_filepath =
+        "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/3_fc.png"
+            .to_string();
 
-    println!("Applied fully connected filter: {}", fc_filepath.display());
-    Ok(fc_filepath
-        .to_str()
-        .ok_or("Failed to convert path to string")?
-        .to_string())
+    println!("Applied fully connected filter: {}", fc_filepath);
+    Ok(fc_filepath)
 }
 
 /// Simple max pooling implementation
