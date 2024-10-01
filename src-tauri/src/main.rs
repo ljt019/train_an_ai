@@ -1,13 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
-use image::{GenericImageView, GrayImage, ImageBuffer, Luma};
+use candle_core;
+use candle_core::Device;
+use image::{GrayImage, ImageBuffer, Luma};
 use imageproc::filter;
 use std::fs;
 use std::path::Path;
 use tauri::command;
+use tauri::InvokeError;
 
 mod ai;
+
+use crate::ai::model::{load_dataset, Model};
 
 // Define Tauri commands
 
@@ -208,6 +213,48 @@ fn max_pooling(img: &GrayImage, pool_size: usize, stride: usize) -> Result<GrayI
     Ok(pooled_img)
 }
 
+#[command]
+fn init_model() -> Result<(), InvokeError> {
+    // Initialize the device (GPU if available, else CPU)
+    let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
+
+    // Load the dataset
+    println!("Loading MNIST dataset...");
+    let dataset = load_dataset();
+    println!("Dataset loaded.");
+
+    println!(
+        "Shape of mnist.train_images: {:?}",
+        dataset.train_images.dims()
+    );
+
+    // Initialize the model
+    let mut model = Model::new(device.clone()).expect("Failed to initialize model");
+
+    // Train the model
+    println!("Starting training...");
+    model.train(&dataset, 10, 32).expect("Training failed"); // Train for 5 epochs with batch size 64
+    println!("Training completed.");
+
+    // Save the trained model
+    model
+        .save("model.safetensors")
+        .expect("FAILED TO SAVE MODEL");
+
+    // Test the model
+    println!("Testing the model...");
+    model.test(&dataset, 32).expect("Testing model failed");
+    println!("Testing completed.");
+
+    // Test the model with a single image
+    println!("Testing the model with a single image...");
+    model
+        .predict("C:\\Users\\lthom\\Projects\\Learning\\ai\\assets\\3.png")
+        .expect("File not found, do a little trolling");
+
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -215,7 +262,8 @@ fn main() {
             train,
             apply_conv_filter,
             apply_pooling_filter,
-            apply_fully_connected_filter
+            apply_fully_connected_filter,
+            init_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
