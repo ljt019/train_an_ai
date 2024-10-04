@@ -5,6 +5,7 @@ import Index from "./screens/index";
 import CollectData from "./screens/collect_data";
 import Training from "./screens/training";
 import ModelLayers from "./screens/model-layers/model_layers";
+import PredictCanvas from "./screens/predict-canvas";
 
 export default function App() {
   const queryClient = new QueryClient();
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/collect_data" element={<CollectData />} />
           <Route path="/model_layers" element={<ModelLayers />} />
           <Route path="/training" element={<Training />} />
+          <Route path="/predict_canvas" element={<PredictCanvas />} />
         </Routes>
       </QueryClientProvider>
     </Router>

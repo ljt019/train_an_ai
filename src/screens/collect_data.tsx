@@ -4,23 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useSaveDrawing } from "@/hooks/api/backend_hooks";
 
-const symbols = [
-  "0",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "+",
-  "-",
-  "×",
-  "÷",
-  "=",
-];
+const symbols = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export default function CollectData() {
   const [currentSymbol, setCurrentSymbol] = useState(0);
@@ -28,7 +12,7 @@ export default function CollectData() {
   const [isDrawing, setIsDrawing] = useState(false);
   const navigate = useNavigate();
 
-  // Initialize the canvas
+  // Initialize the canvas with black background and white drawing color
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -36,12 +20,15 @@ export default function CollectData() {
       canvas.height = 280;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.fillStyle = "white";
+        // Set background to black
+        ctx.fillStyle = "black";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = "black";
+        // Set drawing color to white
+        ctx.strokeStyle = "white";
         ctx.lineWidth = 10;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
+        ctx.beginPath();
       }
     }
   }, [currentSymbol]);
@@ -87,10 +74,10 @@ export default function CollectData() {
       try {
         await saveDrawingMutation.mutateAsync({ imageData, symbol });
 
-        // Clear the canvas
+        // Clear the canvas by filling it with black
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          ctx.fillStyle = "white";
+          ctx.fillStyle = "black";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 

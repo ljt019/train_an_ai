@@ -23,6 +23,7 @@ mnist = "0.6.0"
 ndarray = "0.16.1"
 imageproc = "0.23"
 candle-datasets = "0.7.2"
+rand = "0.8.5"
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!

@@ -3,7 +3,7 @@
 use base64;
 use candle_core;
 use candle_core::Device;
-use image::{GrayImage, ImageBuffer, Luma};
+use image::{GrayImage, ImageBuffer, ImageFormat, Luma};
 use imageproc::filter;
 use std::fs;
 use std::path::Path;
@@ -12,13 +12,102 @@ use tauri::InvokeError;
 
 mod ai;
 
-use crate::ai::model::{load_dataset, Model};
+use crate::ai::model::ConvNet;
+use crate::ai::model::TrainingArgs;
 
 // Define Tauri commands
 
 #[command]
 fn train() {
-    println!("Training the model...");
+    // Create the varmap
+    let mut vm = candle_nn::VarMap::new();
+
+    // Load the model from the file
+    let model = ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors")
+        .expect("Failed to load model");
+
+    // Load the dataset
+    let dataset = ai::utils::create_dataset().expect("Failed to create dataset");
+
+    // Create Training Args
+    let args = TrainingArgs {
+        epochs: 1,
+        learning_rate: 0.001,
+        batch_size: 10,
+        save: Some("temp-assets/model.safetensors".to_string()),
+        load: Some("temp-assets/model.safetensors".to_string()),
+    };
+
+    // Train the model
+    model
+        .train(&dataset, &args, &mut vm)
+        .expect("Failed to train model");
+
+    unimplemented!();
+}
+
+#[command]
+fn predict_from_path(path: &str) -> Result<u32, InvokeError> {
+    println!("Predicting the image...");
+    println!("Path: {}", path);
+    println!("Current directory: {:?}", std::env::current_dir().unwrap());
+
+    // Get the device
+    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(candle_core::Device::Cpu);
+
+    // Create the varmap
+    let mut vm = candle_nn::VarMap::new();
+
+    // Load the model from the file
+    let model = ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors")
+        .expect("Failed to load model");
+
+    // Open the image and convert it to a tensor
+    let image = ai::utils::image_path_to_formatted_tensor(path, &dev)
+        .expect("Failed to convert image to tensor");
+
+    // Get the prediction
+    let prediction = model
+        .predict(&image, &dev)
+        .expect("Failed to predict image");
+
+    println!("Prediction: {}", prediction);
+
+    // Return the prediction
+    Ok(prediction)
+}
+
+#[command]
+fn predict_from_data(image_data: String) -> Result<u32, InvokeError> {
+    // Get the device
+    let dev = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
+
+    // Create the varmap
+    let mut vm = candle_nn::VarMap::new();
+
+    // Load the model from the file
+    let model = ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors")
+        .expect("Failed to load model");
+
+    // Decode the base64 string
+    let image_bytes = base64::decode(image_data).expect("Failed to decode base64 string");
+
+    // Load the image from bytes
+    let img = image::load_from_memory(&image_bytes).expect("Failed to load image from memory");
+
+    // Get image as tensor
+    let image =
+        ai::utils::image_to_formatted_tensor(img).expect("Failed to convert image to tensor");
+
+    // Get the prediction
+    let prediction = model
+        .predict(&image, &dev)
+        .expect("Failed to predict image");
+
+    println!("Prediction: {}", prediction);
+
+    // Return the prediction
+    Ok(prediction)
 }
 
 #[command]
@@ -32,16 +121,25 @@ fn save_drawing(image_data: String, symbol: String) -> Result<(), String> {
     // Decode the base64 string
     let image_bytes = base64::decode(base64_data).map_err(|e| e.to_string())?;
 
+    // Load the image from bytes
+    let img = image::load_from_memory(&image_bytes)
+        .map_err(|e| format!("Failed to load image from memory: {}", e))?;
+
+    // Resize the image to 28x28 using `resize_exact` with nearest-neighbor filter
+    let resized_img = img.resize_exact(28, 28, image::imageops::FilterType::Nearest);
+
     // Create the directory if it doesn't exist
     fs::create_dir_all("drawings").map_err(|e| e.to_string())?;
 
     // Generate the filename
     let filename = format!("drawings/{}.png", symbol);
 
-    // Write the image to the file (this will overwrite if it already exists)
-    fs::write(&filename, image_bytes).map_err(|e| e.to_string())?;
+    // Save the resized image to the file
+    resized_img
+        .save_with_format(&filename, ImageFormat::Png)
+        .map_err(|e| format!("Failed to save resized image: {}", e))?;
 
-    println!("Saved drawing: {}", filename);
+    println!("Saved resized drawing: {}", filename);
     Ok(())
 }
 
@@ -214,43 +312,36 @@ fn max_pooling(img: &GrayImage, pool_size: usize, stride: usize) -> Result<GrayI
 }
 
 #[command]
-fn init_model() -> Result<(), InvokeError> {
-    // Initialize the device (GPU if available, else CPU)
-    let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
+fn reset_temp_assets_directory() -> Result<(), String> {
+    println!("Resetting temp-assets directory...");
 
-    // Load the dataset
-    println!("Loading MNIST dataset...");
-    let dataset = load_dataset();
-    println!("Dataset loaded.");
+    let asset_dir = "assets";
+    let temp_asset_dir = "temp-assets";
 
-    println!(
-        "Shape of mnist.train_images: {:?}",
-        dataset.train_images.dims()
-    );
+    // Remove everything from the temp-assets directory
+    if std::fs::remove_dir_all(temp_asset_dir).is_err() {
+        println!("Failed to remove temp-assets directory or it does not exist.");
+    } else {
+        println!("Removed temp-assets directory.");
+    }
 
-    // Initialize the model
-    let mut model = Model::new(device.clone()).expect("Failed to initialize model");
+    // Create the temp-assets directory
+    std::fs::create_dir(temp_asset_dir)
+        .map_err(|e| format!("Failed to create temp-assets directory: {}", e))?;
+    println!("Created temp-assets directory.");
 
-    // Train the model
-    println!("Starting training...");
-    model.train(&dataset, 10, 32).expect("Training failed"); // Train for 5 epochs with batch size 64
-    println!("Training completed.");
-
-    // Save the trained model
-    model
-        .save("model.safetensors")
-        .expect("FAILED TO SAVE MODEL");
-
-    // Test the model
-    println!("Testing the model...");
-    model.test(&dataset, 32).expect("Testing model failed");
-    println!("Testing completed.");
-
-    // Test the model with a single image
-    println!("Testing the model with a single image...");
-    model
-        .predict("C:\\Users\\lthom\\Projects\\Learning\\ai\\assets\\3.png")
-        .expect("File not found, do a little trolling");
+    // Copy the assets directory to the temp-assets directory
+    for entry in std::fs::read_dir(asset_dir)
+        .map_err(|e| format!("Failed to read assets directory: {}", e))?
+    {
+        let entry =
+            entry.map_err(|e| format!("Failed to read entry in assets directory: {}", e))?;
+        let from = entry.path();
+        let to = Path::new(temp_asset_dir).join(entry.file_name());
+        std::fs::copy(&from, &to)
+            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", from, to, e))?;
+        println!("Copied from {:?} to {:?}", from, to);
+    }
 
     Ok(())
 }
@@ -258,12 +349,14 @@ fn init_model() -> Result<(), InvokeError> {
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            reset_temp_assets_directory,
             save_drawing,
             train,
+            predict_from_path,
+            predict_from_data,
             apply_conv_filter,
             apply_pooling_filter,
             apply_fully_connected_filter,
-            init_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

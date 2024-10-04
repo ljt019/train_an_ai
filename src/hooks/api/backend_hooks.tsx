@@ -13,3 +13,27 @@ export function useSaveDrawing() {
     },
   });
 }
+
+interface MakeDataPredictionPayload {
+  imageData: string;
+}
+
+export function useMakeDataPrediction() {
+  return useMutation<number, Error, MakeDataPredictionPayload>({
+    mutationFn: async ({ imageData }) => {
+      return await invoke("predict_from_data", { imageData });
+    },
+  });
+}
+
+interface MakePathPredictionPayload {
+  path: string;
+}
+
+export function useMakePathPrediction() {
+  return useMutation<string, Error, MakePathPredictionPayload>({
+    mutationFn: async ({ path }) => {
+      return await invoke("predict_from_path", { path });
+    },
+  });
+}
