@@ -6,28 +6,38 @@ use candle_core::Device;
 use image::{GrayImage, ImageBuffer, ImageFormat, Luma};
 use imageproc::filter;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use tauri::api::path::{data_dir, resource_dir};
-use tauri::command;
-use tauri::InvokeError;
-use tauri::Manager;
+use tauri::{command, AppHandle, InvokeError, Manager};
 
 mod ai;
 
-use crate::ai::model::ConvNet;
-use crate::ai::model::TrainingArgs;
+use crate::ai::model::{ConvNet, TrainingArgs};
 
 // Define Tauri commands
 
 #[command]
-fn train(app_handle: tauri::AppHandle) -> Result<(), String> {
+fn train(app_handle: AppHandle) -> Result<(), String> {
     let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Create the varmap
         let mut vm = candle_nn::VarMap::new();
 
-        // Load the model from the file
-        let model = match ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors") {
+        // Load the model from the temp-assets directory
+        let model_path = match get_model_path() {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("Error getting model path: {}", e);
+                app_handle_clone
+                    .emit_all("training_error", e.to_string())
+                    .unwrap_or_else(|err| {
+                        eprintln!("Failed to emit training_error event: {}", err)
+                    });
+                return;
+            }
+        };
+
+        let model = match ConvNet::new_from_file(&mut vm, &PathBuf::from(model_path.clone())) {
             Ok(m) => m,
             Err(e) => {
                 eprintln!("Failed to load model: {}", e);
@@ -40,8 +50,26 @@ fn train(app_handle: tauri::AppHandle) -> Result<(), String> {
             }
         };
 
+        // Get the data directory
+        let data_directory = match data_dir() {
+            Some(dir) => dir,
+            None => {
+                let err_msg = "Data directory not found".to_string();
+                eprintln!("{}", err_msg);
+                app_handle_clone
+                    .emit_all("training_error", err_msg.clone())
+                    .unwrap_or_else(|err| {
+                        eprintln!("Failed to emit training_error event: {}", err)
+                    });
+                return;
+            }
+        };
+
+        // Define the drawings directory within data directory
+        let drawings_dir = data_directory.join("drawings");
+
         // Load the dataset
-        let dataset = match ai::utils::create_dataset() {
+        let dataset = match ai::utils::create_dataset(&drawings_dir) {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("Failed to create dataset: {}", e);
@@ -59,8 +87,8 @@ fn train(app_handle: tauri::AppHandle) -> Result<(), String> {
             epochs: 1,
             learning_rate: 0.01,
             batch_size: 10,
-            save: Some("temp-assets/model.safetensors".to_string()),
-            load: Some("temp-assets/model.safetensors".to_string()),
+            save: Some(model_path.clone()),
+            load: Some(model_path.clone()),
         };
 
         // Train the model
@@ -82,23 +110,24 @@ fn train(app_handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[command]
-fn predict_from_path(path: &str) -> Result<u32, InvokeError> {
+fn predict_from_path(path: String) -> Result<u32, InvokeError> {
     println!("Predicting the image...");
     println!("Path: {}", path);
     println!("Current directory: {:?}", std::env::current_dir().unwrap());
 
     // Get the device
-    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(candle_core::Device::Cpu);
+    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(Device::Cpu);
 
     // Create the varmap
     let mut vm = candle_nn::VarMap::new();
 
-    // Load the model from the file
-    let model = ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors")
-        .expect("Failed to load model");
+    // Load the model from the temp-assets directory
+    let model_path = "temp-assets/model.safetensors".to_string(); // Update to use dynamic path if needed
+    let model =
+        ConvNet::new_from_file(&mut vm, &PathBuf::from(model_path)).expect("Failed to load model");
 
     // Open the image and convert it to a tensor
-    let image = ai::utils::image_path_to_formatted_tensor(path, &dev)
+    let image = ai::utils::image_path_to_formatted_tensor(&PathBuf::from(path), &dev)
         .expect("Failed to convert image to tensor");
 
     // Get the prediction
@@ -120,9 +149,14 @@ fn predict_from_data(image_data: String) -> Result<u32, InvokeError> {
     // Create the varmap
     let mut vm = candle_nn::VarMap::new();
 
-    // Load the model from the file
-    let model = ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors")
-        .expect("Failed to load model");
+    // Use get_model_path() to get the correct model path
+    let model_path = get_model_path().map_err(|e| {
+        eprintln!("Failed to get model path: {}", e);
+        InvokeError::from(e)
+    })?;
+
+    let model =
+        ConvNet::new_from_file(&mut vm, &PathBuf::from(model_path)).expect("Failed to load model");
 
     // Decode the base64 string
     let image_bytes = base64::decode(image_data).expect("Failed to decode base64 string");
@@ -163,30 +197,37 @@ fn save_drawing(image_data: String, symbol: String) -> Result<(), String> {
     // Resize the image to 28x28 using `resize_exact` with nearest-neighbor filter
     let resized_img = img.resize_exact(28, 28, image::imageops::FilterType::Nearest);
 
-    // Create the directory if it doesn't exist
-    fs::create_dir_all("drawings").map_err(|e| e.to_string())?;
+    // Get the data directory
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
+
+    // Define the drawings directory within data directory
+    let drawings_dir = data_directory.join("drawings");
+
+    // Create the drawings directory if it doesn't exist
+    fs::create_dir_all(&drawings_dir).map_err(|e| e.to_string())?;
 
     // Generate the filename
-    let filename = format!("drawings/{}.png", symbol);
+    let filename = drawings_dir.join(format!("{}.png", symbol));
 
     // Save the resized image to the file
     resized_img
         .save_with_format(&filename, ImageFormat::Png)
         .map_err(|e| format!("Failed to save resized image: {}", e))?;
 
-    println!("Saved resized drawing: {}", filename);
+    println!("Saved resized drawing: {:?}", filename);
     Ok(())
 }
 
 #[command]
 fn apply_conv_filter() -> Result<String, String> {
-    // Log the image path
-    //println!("Received image path: {}", image_path);
+    // Get the data directory
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
 
-    let image_path = "drawings/3.png".to_string();
+    // Define the input image path within data directory
+    let image_path = data_directory.join("drawings").join("3.png");
 
     // Resolve the absolute path
-    let absolute_image_path = std::fs::canonicalize(&image_path)
+    let absolute_image_path = fs::canonicalize(&image_path)
         .map_err(|e| format!("Failed to resolve absolute path: {}", e))?;
     println!("Absolute image path: {}", absolute_image_path.display());
 
@@ -203,60 +244,50 @@ fn apply_conv_filter() -> Result<String, String> {
         image::open(&absolute_image_path).map_err(|e| format!("Failed to open image: {}", e))?;
 
     // Convert to grayscale
-    let gray_img: ImageBuffer<Luma<u8>, Vec<u8>> = img.to_luma8();
-
-    let gray_img_f32: ImageBuffer<Luma<f32>, Vec<f32>> =
-        ImageBuffer::from_fn(gray_img.width(), gray_img.height(), |x, y| {
-            Luma([gray_img.get_pixel(x, y).0[0] as f32])
-        });
+    let gray_img: GrayImage = img.to_luma8();
 
     // Define a convolution kernel (e.g., edge detection)
     let kernel: [f32; 9] = [-1.0, -1.0, -1.0, -1.0, 8.0, -1.0, -1.0, -1.0, -1.0];
 
     // Apply convolution using imageproc's convolution function
-    let conv_img: ImageBuffer<Luma<f32>, Vec<f32>> = filter::filter3x3(&gray_img_f32, &kernel);
+    let conv_img: ImageBuffer<Luma<f32>, Vec<f32>> = filter::filter3x3(&gray_img, &kernel);
 
     // Convert back to u8
-    let conv_img: ImageBuffer<Luma<u8>, Vec<u8>> =
-        ImageBuffer::from_fn(conv_img.width(), conv_img.height(), |x, y| {
-            Luma([conv_img.get_pixel(x, y).0[0].clamp(0.0, 255.0) as u8])
-        });
+    let conv_img: GrayImage = ImageBuffer::from_fn(conv_img.width(), conv_img.height(), |x, y| {
+        Luma([conv_img.get_pixel(x, y).0[0].clamp(0.0, 255.0) as u8])
+    });
 
-    // Create the directory if it doesn't exist
-    let conv_dir = "processed_drawings";
-    fs::create_dir_all(conv_dir)
-        .map_err(|e| format!("Failed to create directory {}: {}", conv_dir, e))?;
-
-    // Generate the filename
-    let filename = Path::new(&image_path)
-        .file_stem()
-        .ok_or_else(|| "Invalid image path".to_string())?
-        .to_str()
-        .ok_or_else(|| "Invalid filename".to_string())?
-        .to_string();
-    let conv_filename = format!("{}/{}_conv.png", conv_dir, filename);
-
-    // Save the processed image
+    // Encode the processed image to PNG format in memory using Cursor
+    let mut buffer = std::io::Cursor::new(Vec::new());
     conv_img
-        .save(&conv_filename)
-        .map_err(|e| format!("Failed to save image: {}", e))?;
+        .write_to(&mut buffer, ImageFormat::Png)
+        .map_err(|e| format!("Failed to write image to buffer: {}", e))?;
 
-    // Get the absolute path of the processed image
-    let conv_filepath =
-        "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/3_conv.png"
-            .to_string();
+    // Encode the buffer to Base64
+    let base64_image = base64::encode(&buffer.into_inner());
 
-    println!("Applied convolution filter: {}", conv_filepath);
-
-    Ok(conv_filepath)
+    // Return the Base64 string
+    Ok(base64_image)
 }
 
 #[command]
 fn apply_pooling_filter() -> Result<String, String> {
-    let image_path = "processed_drawings/3_conv.png".to_string();
+    // Get the data directory
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
+
+    // Define the input image path within processed_drawings
+    let image_path = data_directory.join("processed_drawings").join("3_conv.png");
+
+    // Check if the file exists
+    if !image_path.exists() {
+        return Err(format!(
+            "Image file does not exist: {}",
+            image_path.display()
+        ));
+    }
 
     // Load the image
-    let img = image::open(&image_path).map_err(|e| e.to_string())?;
+    let img = image::open(&image_path).map_err(|e| format!("Failed to open image: {}", e))?;
 
     // Convert to grayscale
     let gray_img = img.to_luma8();
@@ -268,52 +299,52 @@ fn apply_pooling_filter() -> Result<String, String> {
     // Apply max pooling
     let pooled_img = max_pooling(&gray_img, pool_size, stride)?;
 
-    // Create the directory if it doesn't exist
-    fs::create_dir_all("processed_drawings").map_err(|e| e.to_string())?;
+    // Encode the processed image to PNG format in memory
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    pooled_img
+        .write_to(&mut buffer, ImageFormat::Png)
+        .map_err(|e| format!("Failed to write image to buffer: {}", e))?;
 
-    // Create filename
-    let pool_filename = "processed_drawings/3_pool.png".to_string();
+    // Encode the buffer to Base64
+    let base64_image = base64::encode(&buffer.into_inner());
 
-    // Save the processed image
-    pooled_img.save(&pool_filename).map_err(|e| e.to_string())?;
-
-    // Get the absolute path of the processed image
-    let pool_filepath =
-        "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/3_pool.png"
-            .to_string();
-
-    println!("Applied pooling filter: {}", pool_filepath);
-    Ok(pool_filepath)
+    // Return the Base64 string
+    Ok(base64_image)
 }
 
 #[command]
 fn apply_fully_connected_filter() -> Result<String, String> {
-    // For visualization purposes, we'll simulate the fully connected layer
-    // by applying a brightness adjustment.
+    // Get the data directory
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
 
-    let image_path = "processed_drawings/3_pool.png".to_string();
+    // Define the input image path within processed_drawings
+    let image_path = data_directory.join("processed_drawings").join("3_pool.png");
+
+    // Check if the file exists
+    if !image_path.exists() {
+        return Err(format!(
+            "Image file does not exist: {}",
+            image_path.display()
+        ));
+    }
 
     // Load the image
-    let img = image::open(&image_path).map_err(|e| e.to_string())?;
+    let img = image::open(&image_path).map_err(|e| format!("Failed to open image: {}", e))?;
 
     // Apply brightness increase
     let bright_img = img.brighten(25); // Increase brightness by 25
 
-    // Create the directory if it doesn't exist
-    fs::create_dir_all("processed_drawings").map_err(|e| e.to_string())?;
+    // Encode the processed image to PNG format in memory
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    bright_img
+        .write_to(&mut buffer, ImageFormat::Png)
+        .map_err(|e| format!("Failed to write image to buffer: {}", e))?;
 
-    let fc_filename = "processed_drawings/3_fc.png".to_string();
+    // Encode the buffer to Base64
+    let base64_image = base64::encode(&buffer.into_inner());
 
-    // Save the processed image
-    bright_img.save(&fc_filename).map_err(|e| e.to_string())?;
-
-    // Get the absolute path of the processed image
-    let fc_filepath =
-        "C:/Users/lthom/Projects/Exhibits/number_proto/src-tauri/processed_drawings/3_fc.png"
-            .to_string();
-
-    println!("Applied fully connected filter: {}", fc_filepath);
-    Ok(fc_filepath)
+    // Return the Base64 string
+    Ok(base64_image)
 }
 
 /// Simple max pooling implementation
@@ -347,47 +378,110 @@ fn max_pooling(img: &GrayImage, pool_size: usize, stride: usize) -> Result<GrayI
 }
 
 #[command]
-fn reset_temp_assets_directory(app: tauri::AppHandle) -> Result<(), String> {
-    let package_info = app.package_info();
-    let env = app.env();
-
-    println!("Resetting temp-assets directory...");
-
-    // 1. Get the resource directory (read-only, contains bundled assets)
-    let resource_directory = resource_dir(&package_info, &env)
-        .ok_or_else(|| "Resource directory not found".to_string())?;
-
-    // 2. Define the path to the model file within resource directory
-    let model_source = resource_directory.join("assets").join("model.safetensors");
-
-    // 3. Check if the model source exists
-    if !model_source.exists() {
-        return Err(format!("Model file not found at {:?}", model_source));
-    }
-
-    // 4. Get the data directory (writable, suitable for temporary assets)
+fn get_input_image() -> Result<String, String> {
+    // Step 1: Get the data directory
     let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
 
-    // 5. Define the temp-assets directory within data directory
+    // Step 2: Define the path to the 'drawings' directory and '3.png' image
+    let image_path = data_directory.join("drawings").join("3.png");
+
+    // Step 3: Check if the image file exists
+    if !image_path.exists() {
+        return Err(format!(
+            "Input image file does not exist: {}",
+            image_path.display()
+        ));
+    }
+
+    // Step 4: Load the image
+    let img: image::DynamicImage =
+        image::open(&image_path).map_err(|e| format!("Failed to open input image: {}", e))?;
+
+    // Encode the processed image to PNG format in memory
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buffer, ImageFormat::Png)
+        .map_err(|e| format!("Failed to write image to buffer: {}", e))?;
+
+    // Encode the buffer to Base64
+    let base64_image = base64::encode(&buffer.into_inner());
+
+    // Step 6: Return the Base64 string
+    Ok(base64_image)
+}
+
+/// Helper function to get the model path from temp-assets directory
+fn get_model_path() -> Result<String, String> {
+    // Get the data directory
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
+
+    // Define the temp-assets directory within data directory
     let temp_asset_dir = data_directory.join("temp-assets");
 
-    // 6. Remove the temp-assets directory if it exists
-    if std::fs::remove_dir_all(&temp_asset_dir).is_err() {
+    // Define the model file path
+    let model_path = temp_asset_dir.join("model.safetensors");
+
+    // Check if the model file exists
+    if !model_path.exists() {
+        return Err(format!("Model file does not exist at {:?}", model_path));
+    }
+
+    // Return the absolute path as a string
+    let absolute_path = fs::canonicalize(&model_path)
+        .expect("Failed to get absolute path")
+        .to_str()
+        .ok_or_else(|| "Failed to convert path to string".to_string())
+        .map(|s| s.to_string())
+        .map_err(|e| format!("Failed to get absolute path: {}", e))?
+        .to_string();
+
+    Ok(absolute_path)
+}
+
+/// Corrected reset_temp_assets_directory function
+#[command]
+fn reset_temp_assets_directory(app_handle: AppHandle) -> Result<(), String> {
+    println!("Resetting temp-assets directory...");
+
+    // Get the data directory
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
+
+    // Define the assets and temp-assets directories
+    let resource_directory = resource_dir(&app_handle.package_info(), &app_handle.env())
+        .ok_or_else(|| "Resource directory not found".to_string())?;
+    let assets_dir = resource_directory.join("assets");
+    let temp_asset_dir = data_directory.join("temp-assets");
+
+    // Check if assets_dir exists
+    if !assets_dir.exists() {
+        return Err(format!(
+            "Assets directory does not exist at {:?}",
+            assets_dir
+        ));
+    }
+
+    // Remove the temp-assets directory if it exists
+    if fs::remove_dir_all(&temp_asset_dir).is_err() {
         println!("Failed to remove temp-assets directory or it does not exist.");
     } else {
         println!("Removed temp-assets directory.");
     }
 
-    // 7. Create the temp-assets directory
-    std::fs::create_dir_all(&temp_asset_dir)
+    // Create the temp-assets directory
+    fs::create_dir_all(&temp_asset_dir)
         .map_err(|e| format!("Failed to create temp-assets directory: {}", e))?;
     println!("Created temp-assets directory.");
 
-    // 8. Define the destination path for the model file
+    // Define the source and destination paths for model.safetensors
+    let model_source = assets_dir.join("model.safetensors");
     let model_destination = temp_asset_dir.join("model.safetensors");
 
-    // 9. Copy the model.safetensors file from resources to temp-assets
-    std::fs::copy(&model_source, &model_destination).map_err(|e| {
+    // Check if model_source exists
+    if !model_source.exists() {
+        return Err(format!("Model file does not exist at {:?}", model_source));
+    }
+
+    // Copy the model.safetensors file from assets to temp-assets
+    fs::copy(&model_source, &model_destination).map_err(|e| {
         format!(
             "Failed to copy from {:?} to {:?}: {}",
             model_source, model_destination, e
@@ -409,6 +503,7 @@ fn main() {
             apply_conv_filter,
             apply_pooling_filter,
             apply_fully_connected_filter,
+            get_input_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

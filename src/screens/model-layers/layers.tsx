@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
-import { readBinaryFile } from "@tauri-apps/api/fs";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -26,19 +25,6 @@ ChartJS.register(
   Legend
 );
 
-function convertToBase64(buffer: Uint8Array): string {
-  let binary = "";
-  const len = buffer.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(buffer[i]);
-  }
-  return window.btoa(binary);
-}
-
-interface LayerProps {
-  image_path: string;
-}
-
 function ExpandableImage({ src, alt }: { src: string; alt: string }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -59,7 +45,24 @@ function ExpandableImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export function InputLayer({ image_path }: LayerProps) {
+export function InputLayer() {
+  const [inputImage, setInputImage] = useState<string>("");
+  const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchInputImage = async () => {
+      try {
+        const base64Data: string = await invoke("get_input_image");
+        setInputImage(`data:image/png;base64,${base64Data}`);
+      } catch (error) {
+        console.error("Error fetching input image:", error);
+        setErrorOccurred(true);
+      }
+    };
+
+    fetchInputImage();
+  }, []);
+
   return (
     <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
       <CardHeader>
@@ -77,30 +80,40 @@ export function InputLayer({ image_path }: LayerProps) {
           (28 * 28) input neurons. The brightness of each pixel is represented
           as a number between 0 (black) and 255 (white).
         </p>
-        <img
-          src={image_path}
-          alt="Input Layer"
-          className="rounded-lg mx-auto mb-4 w-64 h-64 object-cover"
-        />
-        <ExpandableImage src={image_path} alt="Input Layer" />
+        {inputImage ? (
+          <>
+            <img
+              src={inputImage}
+              alt="Input Layer"
+              className="rounded-lg mx-auto mb-4 w-64 h-64 object-cover"
+            />
+            <ExpandableImage src={inputImage} alt="Input Layer" />
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-64">
+            {errorOccurred ? (
+              <p className="text-red-500">
+                An error occurred while fetching the input image.
+              </p>
+            ) : (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-export function ConvolutionalLayer({ image_path }: LayerProps) {
+export function ConvolutionalLayer() {
   const [processedImage, setProcessedImage] = useState<string>("");
   const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
 
   useEffect(() => {
     const processImage = async () => {
       try {
-        const convFilename: string = await invoke("apply_conv_filter", {
-          imagePath: image_path,
-        });
-        const absolutePath = convFilename;
-        const binaryData = await readBinaryFile(absolutePath);
-        const base64Data = convertToBase64(binaryData);
+        // Invoke the backend command without passing image_path
+        const base64Data: string = await invoke("apply_conv_filter");
         setProcessedImage(`data:image/png;base64,${base64Data}`);
       } catch (error) {
         console.error("Error processing convolutional layer:", error);
@@ -109,7 +122,7 @@ export function ConvolutionalLayer({ image_path }: LayerProps) {
     };
 
     processImage();
-  }, [image_path]);
+  }, []); // Removed image_path dependency
 
   return (
     <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
@@ -157,19 +170,15 @@ export function ConvolutionalLayer({ image_path }: LayerProps) {
   );
 }
 
-export function PoolingLayer({ image_path }: LayerProps) {
+export function PoolingLayer() {
   const [processedImage, setProcessedImage] = useState<string>("");
   const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
 
   useEffect(() => {
     const processImage = async () => {
       try {
-        const poolFilename: string = await invoke("apply_pooling_filter", {
-          image_path,
-        });
-        const absolutePath = poolFilename;
-        const binaryData = await readBinaryFile(absolutePath);
-        const base64Data = convertToBase64(binaryData);
+        // Invoke the backend command without passing image_path
+        const base64Data: string = await invoke("apply_pooling_filter");
         setProcessedImage(`data:image/png;base64,${base64Data}`);
       } catch (error) {
         console.error("Error processing pooling layer:", error);
@@ -178,7 +187,7 @@ export function PoolingLayer({ image_path }: LayerProps) {
     };
 
     processImage();
-  }, [image_path]);
+  }, []); // Removed image_path dependency
 
   return (
     <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
@@ -312,13 +321,13 @@ export function FullyConnectedLayer() {
           layer is a probability distribution over the 10 possible digit
           classes.
         </p>
-        <div className="h-64 mb-4">
+        <div className="h-64 mb-4 flex justify-center">
           <Bar options={options} data={chartData} />
         </div>
         <p className="text-sm text-gray-300">
-          Note: This chart shows a simulated output. In a trained model, you
-          would see higher probabilities for the correct digit and lower
-          probabilities for others.
+          Note: This chart shows a simulated output because our model isn't
+          trained yet. In a trained model, you would see higher probabilities
+          for the correct digit and lower probabilities for others.
         </p>
       </CardContent>
     </Card>

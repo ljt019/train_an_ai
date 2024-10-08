@@ -32,7 +32,7 @@ export default function Index() {
           onClick={() => navigate("/base-info")}
           className="text-lg px-8 py-4 bg-white text-purple-700 hover:bg-purple-100 transition-all duration-800 animate-slow-bounce"
         >
-          Begin Your AI Journey
+          Begin Training Your AI
         </Button>
       </div>
     </div>

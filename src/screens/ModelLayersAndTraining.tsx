@@ -119,7 +119,7 @@ export default function ModelLayersAndTraining() {
   const allLayersViewed = currentLayer === LAYERS.length - 1;
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 text-white">
+    <div className="mx-auto px-4 py-8 min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 text-white">
       <h1 className="text-4xl font-bold text-center mb-8 animate-fade-in-down">
         CNN Model Layers and Training
       </h1>
@@ -130,7 +130,7 @@ export default function ModelLayersAndTraining() {
             <CardTitle className="text-2xl"></CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-4">
-            <CurrentLayerComponent image_path={IMAGE_PATH} />
+            <CurrentLayerComponent />
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button

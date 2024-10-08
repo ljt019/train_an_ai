@@ -103,7 +103,7 @@ export default function PredictCanvas() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 text-white">
+    <div className="mx-auto px-4 py-8 min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 text-white justify-center items-center h-screen flex">
       <Card className="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-lg animate-fade-in">
         <CardHeader>
           <CardTitle className="text-3xl font-bold text-center">

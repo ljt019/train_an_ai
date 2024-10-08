@@ -1,10 +1,16 @@
-use candle_core::Tensor;
+use candle_core::{DType, Tensor, D};
+use candle_datasets;
+use candle_nn::{loss, ops};
+use image::{DynamicImage, GrayImage};
+use std::path::PathBuf;
 
 pub fn image_path_to_formatted_tensor(
-    path: &str,
+    path: &PathBuf,
     device: &candle_core::Device,
 ) -> candle_core::Result<Tensor> {
-    let image = image::open(path).expect("Failed to open image");
+    let image = image::open(path)
+        .map_err(|e| format!("Failed to open image: {}", e))
+        .expect("Failed to open image");
     let image = image.resize_exact(28, 28, image::imageops::FilterType::Nearest);
     let image = image.to_luma8().into_raw();
     let image = image
@@ -16,21 +22,15 @@ pub fn image_path_to_formatted_tensor(
     Ok(image)
 }
 
-pub fn image_to_formatted_tensor(image: image::DynamicImage) -> candle_core::Result<Tensor> {
-    // Get the device
-    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(candle_core::Device::Cpu);
-
-    // format the image
+pub fn image_to_formatted_tensor(image: DynamicImage) -> candle_core::Result<Tensor> {
+    // Assuming device is handled externally
     let image = format_image(image);
-
-    // Turn the image into a tensor
+    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(candle_core::Device::Cpu);
     let image = Tensor::from_vec(image, &[784], &dev).expect("Failed to create tensor");
-
-    // Return the image tensor
     Ok(image)
 }
 
-pub fn format_image(image: image::DynamicImage) -> Vec<f32> {
+pub fn format_image(image: DynamicImage) -> Vec<f32> {
     let image = image.resize_exact(28, 28, image::imageops::FilterType::Nearest);
     let image = image.to_luma8().into_raw();
     let image = image
@@ -41,18 +41,19 @@ pub fn format_image(image: image::DynamicImage) -> Vec<f32> {
 }
 
 /// Creates a `Dataset` with training images from `drawings` and test images from MNIST.
-pub fn create_dataset() -> candle_core::Result<candle_datasets::vision::Dataset> {
+pub fn create_dataset(
+    drawings_dir: &PathBuf,
+) -> candle_core::Result<candle_datasets::vision::Dataset> {
     // Get the device
-    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(candle_core::Device::Cpu);
-
-    let drawings_dir = "drawings";
+    let dev = candle_core::Device::cuda_if_available(0)?;
 
     // Read all image files from the drawings directory
     let entries = std::fs::read_dir(drawings_dir)
         .map_err(|e| {
             format!(
                 "Failed to read drawings directory '{}': {}",
-                drawings_dir, e
+                drawings_dir.display(),
+                e
             )
         })
         .expect("Failed to read drawings directory");
@@ -76,18 +77,16 @@ pub fn create_dataset() -> candle_core::Result<candle_datasets::vision::Dataset>
                             // Attempt to parse the label as a u32
                             if let Ok(label) = stem_str.parse::<u32>() {
                                 // Load and process the image
-                                let image = image::open(&path)
-                                    .map_err(|e| {
-                                        format!("Failed to open image '{:?}': {}", path, e)
-                                    })
-                                    .expect("Failed to open image");
-
-                                let tensor = image_to_formatted_tensor(image)?;
-
+                                let tensor = image_path_to_formatted_tensor(&path, &dev)?;
                                 train_images.push(tensor);
                                 train_labels.push(label as f32); // Assuming labels are u32, convert to f32
                             } else {
-                                panic!("Invalid label in filename: {:?}", path);
+                                return Err(candle_core::Error::CannotFindTensor {
+                                    path: (path
+                                        .to_str()
+                                        .expect("Failed to convert path to string"))
+                                    .to_string(),
+                                });
                             }
                         }
                     }
@@ -97,7 +96,12 @@ pub fn create_dataset() -> candle_core::Result<candle_datasets::vision::Dataset>
     }
 
     if train_images.is_empty() {
-        panic!("No images found in drawings directory: {:?}", drawings_dir);
+        return Err(candle_core::Error::CannotFindTensor {
+            path: (drawings_dir
+                .to_str()
+                .expect("Failed to convert path to string"))
+            .to_string(),
+        });
     }
 
     // Load MNIST dataset for testing
@@ -140,6 +144,5 @@ pub fn create_dataset() -> candle_core::Result<candle_datasets::vision::Dataset>
 
 pub fn get_mnist_dataset() -> candle_core::Result<candle_datasets::vision::Dataset> {
     let dataset = candle_datasets::vision::mnist::load();
-
-    return dataset;
+    dataset
 }

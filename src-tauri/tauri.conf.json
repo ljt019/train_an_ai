@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "number_proto",
+    "productName": "train-an-ai",
     "version": "0.1.0"
   },
   "tauri": {
@@ -35,8 +35,8 @@
     },
     "bundle": {
       "active": true,
-      "targets": "all",
-      "identifier": "com.number_proto.app",
+      "targets": "nsis",
+      "identifier": "com.train-an-ai.app",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

@@ -3,6 +3,7 @@ use candle_core::{DType, Tensor, D};
 use candle_datasets;
 use candle_nn::{loss, ops, Conv2d, Linear, ModuleT, Optimizer, VarBuilder, VarMap};
 use rand::prelude::*;
+use std::path::PathBuf;
 
 const LABELS: usize = 10;
 
@@ -18,10 +19,8 @@ pub struct ConvNet {
 
 impl ConvNet {
     pub fn new(vm: &mut VarMap) -> candle_core::Result<Self> {
-        // Get Device
         let dev = candle_core::Device::cuda_if_available(0)?;
 
-        // Create vb
         let vb = VarBuilder::from_varmap(&vm, DType::F32, &dev);
 
         let conv1 = candle_nn::conv2d(1, 64, 2, Default::default(), vb.pp("c1"))?;
@@ -40,16 +39,12 @@ impl ConvNet {
         })
     }
 
-    pub fn new_from_file(vm: &mut VarMap, path: &str) -> candle_core::Result<Self> {
-        // Create a new ConvNet
-        let model = ConvNet::new(vm).expect("Failed to create model");
-
-        // Load weights and biases from file
+    pub fn new_from_file(vm: &mut VarMap, path: &PathBuf) -> candle_core::Result<Self> {
+        let mut model = ConvNet::new(vm)?;
         vm.load(path)
-            .expect("Failed to load weights and biases from file");
-
-        // Return the model
-        return Ok(model);
+            .map_err(|e| format!("Failed to load model: {}", e))
+            .expect("Failed to load model");
+        Ok(model)
     }
 
     fn forward(&self, xs: &Tensor, train: bool) -> candle_core::Result<Tensor> {
@@ -77,10 +72,7 @@ impl ConvNet {
         image: &Tensor,
         device: &candle_core::Device,
     ) -> candle_core::Result<u32> {
-        // Add batch dimension
         let image = image.unsqueeze(0)?;
-
-        // Forward pass through the model
         let logits = self.forward(&image.to_device(device)?, false)?;
         let label = logits.argmax(D::Minus1)?;
         let label = label.squeeze(0)?;
@@ -179,7 +171,6 @@ impl ConvNet {
         for i in 0..n_batches {
             let images = test_images.narrow(0, i * batch_size, batch_size)?;
             let labels = test_labels.narrow(0, i * batch_size, batch_size)?;
-
             let labels = labels.to_dtype(DType::U32)?;
 
             let logits = self.forward(&images, false)?;
