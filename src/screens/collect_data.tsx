@@ -1,8 +1,10 @@
-// src/components/CollectData.tsx
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { useSaveDrawing } from "@/hooks/api/backend_hooks";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { ArrowRight, Pencil } from "lucide-react";
 
 const symbols = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
@@ -12,7 +14,6 @@ export default function CollectData() {
   const [isDrawing, setIsDrawing] = useState(false);
   const navigate = useNavigate();
 
-  // Initialize the canvas with black background and white drawing color
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -20,10 +21,8 @@ export default function CollectData() {
       canvas.height = 280;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        // Set background to black
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        // Set drawing color to white
         ctx.strokeStyle = "white";
         ctx.lineWidth = 10;
         ctx.lineCap = "round";
@@ -33,7 +32,6 @@ export default function CollectData() {
     }
   }, [currentSymbol]);
 
-  // Initialize the saveDrawing mutation
   const saveDrawingMutation = useSaveDrawing();
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -74,7 +72,6 @@ export default function CollectData() {
       try {
         await saveDrawingMutation.mutateAsync({ imageData, symbol });
 
-        // Clear the canvas by filling it with black
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.fillStyle = "black";
@@ -82,59 +79,67 @@ export default function CollectData() {
         }
 
         if (currentSymbol === symbols.length - 1) {
-          // If it's the last symbol, navigate to the model layers page
-          navigate("/model_layers");
+          navigate("/training-and-info");
         } else {
-          // Move to the next symbol
           setCurrentSymbol((prev) => prev + 1);
         }
       } catch (error) {
         console.error("Failed to save drawing:", error);
-        // Optionally, you can show an error message to the user here
       }
     }
   };
 
   const isLastDrawing = currentSymbol === symbols.length - 1;
+  const progress = ((currentSymbol + 1) / symbols.length) * 100;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <h1 className="text-3xl font-bold mb-4">Draw {symbols[currentSymbol]}</h1>
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseUp={stopDrawing}
-        onMouseOut={stopDrawing}
-        onMouseMove={draw}
-        className="border-2 border-gray-300 rounded-lg shadow-md"
-        aria-label={`Drawing canvas for symbol ${symbols[currentSymbol]}`}
-      />
-      <button
-        onClick={saveDrawing}
-        className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-        aria-label={
-          isLastDrawing
-            ? "Save and begin training"
-            : "Save and go to next symbol"
-        }
-        disabled={saveDrawingMutation.isPending}
-      >
-        {saveDrawingMutation.isPending
-          ? "Saving..."
-          : isLastDrawing
-          ? "Save and Begin Training"
-          : "Save and Next"}
-      </button>
-      <p className="mt-4 text-sm text-gray-600">
-        {isLastDrawing
-          ? "This is the last symbol. After saving, you'll proceed to training."
-          : `Symbol ${currentSymbol + 1} of ${symbols.length}`}
-      </p>
-      {saveDrawingMutation.isError && (
-        <p className="mt-2 text-red-500">
-          Error saving drawing. Please try again.
-        </p>
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 text-white p-8 flex items-center justify-center">
+      <Card className="w-full max-w-2xl bg-white/10 backdrop-blur-lg animate-fade-in">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-center flex items-center justify-center">
+            <Pencil className="mr-2" /> Draw {symbols[currentSymbol]}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center space-y-6">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={startDrawing}
+            onMouseUp={stopDrawing}
+            onMouseOut={stopDrawing}
+            onMouseMove={draw}
+            className="border-4 border-white rounded-lg shadow-lg"
+            aria-label={`Drawing canvas for symbol ${symbols[currentSymbol]}`}
+          />
+          <Button
+            onClick={saveDrawing}
+            className="w-full max-w-xs text-lg px-6 py-3 bg-white text-purple-700 hover:bg-purple-100 transition-all duration-800 animate-slow-bounce"
+            disabled={saveDrawingMutation.isPending}
+          >
+            {saveDrawingMutation.isPending ? (
+              "Saving..."
+            ) : isLastDrawing ? (
+              <>
+                Save and Begin Training <ArrowRight className="ml-2" />
+              </>
+            ) : (
+              "Save and Next"
+            )}
+          </Button>
+          <div className="w-full max-w-xs">
+            <Progress value={progress} className="h-2" />
+            <p className="mt-2 text-sm text-center">
+              {isLastDrawing
+                ? "This is the last symbol. After saving, you'll proceed to training."
+                : `Symbol ${currentSymbol + 1} of ${symbols.length}`}
+            </p>
+          </div>
+          {saveDrawingMutation.isError && (
+            <p className="text-red-300 animate-fade-in">
+              Error saving drawing. Please try again.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

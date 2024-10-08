@@ -3,9 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import Index from "./screens/index";
 import CollectData from "./screens/collect_data";
-import Training from "./screens/training";
-import ModelLayers from "./screens/model-layers/model_layers";
 import PredictCanvas from "./screens/predict-canvas";
+import BaseInfo from "./screens/base_info";
+import ModelLayersAndTraining from "./screens/ModelLayersAndTraining";
 
 export default function App() {
   const queryClient = new QueryClient();
@@ -15,12 +15,27 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/collect_data" element={<CollectData />} />
-          <Route path="/model_layers" element={<ModelLayers />} />
-          <Route path="/training" element={<Training />} />
+          <Route path="/base-info" element={<BaseInfo />} />
+          <Route path="/collect-training-data" element={<CollectData />} />
+          <Route
+            path="/training-and-info"
+            element={<ModelLayersAndTraining />}
+          />
           <Route path="/predict_canvas" element={<PredictCanvas />} />
         </Routes>
       </QueryClientProvider>
     </Router>
   );
 }
+
+/*
+Planning:
+
+Routes
+ - / (Index)
+ - /base-info
+ - /collect-training-data
+ - /training-and-info 
+ - /prediction-canvas
+
+*/

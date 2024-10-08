@@ -113,7 +113,7 @@ pub fn create_dataset() -> candle_core::Result<candle_datasets::vision::Dataset>
     let train_labels_length = train_labels.len();
 
     // Concatenate all training images into a single tensor
-    let concatenated_train_images = concatenate_tensors(&train_images, 0)?; // Shape: [num_train_samples,784]
+    let concatenated_train_images = Tensor::stack(&train_images, 0)?; // Shape: [num_train_samples,784]
 
     // Convert training labels into a single tensor
     let train_labels_tensor =
@@ -136,40 +136,6 @@ pub fn create_dataset() -> candle_core::Result<candle_datasets::vision::Dataset>
         test_labels,
         labels: unique_labels,
     })
-}
-
-// Concatenates a list of tensors along the specified dimension.
-fn concatenate_tensors(tensors: &[Tensor], dim: usize) -> candle_core::Result<Tensor> {
-    // Get the device
-    let dev = candle_core::Device::cuda_if_available(0).unwrap_or(candle_core::Device::Cpu);
-
-    if tensors.is_empty() {
-        panic!("No Tensors");
-    }
-
-    let first_shape = tensors[0].shape();
-
-    // Ensure all tensors have the same shape except for the concatenation dimension
-    for tensor in tensors.iter().skip(1) {
-        for (i, dim_size) in tensor.shape().dims().iter().enumerate() {
-            if i != dim && dim_size != &first_shape.dims()[i] {
-                panic!("No Tensors");
-            }
-        }
-    }
-
-    // Compute the new shape
-    let mut new_shape = first_shape.dims().to_vec();
-    new_shape[dim] = tensors.iter().map(|t| t.shape().dims()[dim]).sum();
-
-    // Initialize a new tensor to hold the concatenated data
-    let mut concatenated_data = Vec::with_capacity(new_shape.iter().product());
-
-    for tensor in tensors {
-        concatenated_data.extend(tensor.to_vec1::<f32>()?);
-    }
-
-    candle_core::Tensor::from_vec(concatenated_data, new_shape, &dev)
 }
 
 pub fn get_mnist_dataset() -> candle_core::Result<candle_datasets::vision::Dataset> {

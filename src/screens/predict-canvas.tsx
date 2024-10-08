@@ -1,7 +1,15 @@
-// src/components/PredictCanvas.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { useMakeDataPrediction } from "@/hooks/api/backend_hooks";
 import { useNavigate } from "react-router-dom";
+import { useMakeDataPrediction } from "@/hooks/api/backend_hooks";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Loader2, Pencil, Trash2, Home } from "lucide-react";
 
 export default function PredictCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -10,7 +18,6 @@ export default function PredictCanvas() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Initialize the canvas with black background and white drawing color
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -18,10 +25,8 @@ export default function PredictCanvas() {
       canvas.height = 280;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        // Set background to black
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        // Set drawing color to white
         ctx.strokeStyle = "white";
         ctx.lineWidth = 10;
         ctx.lineCap = "round";
@@ -31,7 +36,6 @@ export default function PredictCanvas() {
     }
   }, []);
 
-  // Initialize the makeDataPrediction mutation
   const makeDataPredictionMutation = useMakeDataPrediction();
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -69,7 +73,6 @@ export default function PredictCanvas() {
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Refill with black background
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.beginPath();
@@ -83,15 +86,11 @@ export default function PredictCanvas() {
     const canvas = canvasRef.current;
     if (canvas) {
       const imageData = canvas.toDataURL("image/png");
-
-      // Remove the "data:image/png;base64," prefix
       const base64Data = imageData.split(",").pop() || "";
 
       try {
-        // **IMPORTANT:** Ensure the parameter name matches the backend expectation.
-        // If the backend expects 'image_data', use that instead of 'imageData'.
         const pred = await makeDataPredictionMutation.mutateAsync({
-          imageData: base64Data, // Changed from imageData to image_data
+          imageData: base64Data,
         });
         setPrediction(pred);
         setError(null);
@@ -103,54 +102,59 @@ export default function PredictCanvas() {
     }
   };
 
-  const handleDoneDrawing = () => {
-    // Navigate to the home page ("/") or index route
-    navigate("/");
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <h1 className="text-3xl font-bold mb-4">Draw a Symbol for Prediction</h1>
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseUp={stopDrawing}
-        onMouseOut={stopDrawing}
-        onMouseMove={draw}
-        className="border-2 border-gray-300 rounded-lg shadow-md"
-        aria-label="Drawing canvas for prediction"
-      />
-      <div className="mt-4 flex space-x-4">
-        <button
-          onClick={predictDrawing}
-          className="px-6 py-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
-          disabled={makeDataPredictionMutation.isPending}
-          aria-label="Predict drawing"
-        >
-          {makeDataPredictionMutation.isPending ? "Predicting..." : "Predict"}
-        </button>
-        <button
-          onClick={clearCanvas}
-          className="px-6 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
-          aria-label="Clear canvas"
-        >
-          Clear
-        </button>
-        {/* New "Done Drawing" Button */}
-        <button
-          onClick={handleDoneDrawing}
-          className="px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-          aria-label="Done Drawing"
-        >
-          Done Drawing
-        </button>
-      </div>
-      {prediction !== null && (
-        <p className="mt-4 text-xl">
-          <strong>Prediction:</strong> {prediction}
-        </p>
-      )}
-      {error && <p className="mt-4 text-red-500">{error}</p>}
+    <div className="container mx-auto px-4 py-8 min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 text-white">
+      <Card className="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-lg animate-fade-in">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-center">
+            Draw a Symbol for Prediction
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center space-y-4">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={startDrawing}
+            onMouseUp={stopDrawing}
+            onMouseOut={stopDrawing}
+            onMouseMove={draw}
+            className="border-2 border-white rounded-lg shadow-md"
+            aria-label="Drawing canvas for prediction"
+          />
+          {prediction !== null && (
+            <p className="text-2xl font-bold animate-fade-in">
+              Prediction: {prediction}
+            </p>
+          )}
+          {error && <p className="text-red-300 animate-fade-in">{error}</p>}
+        </CardContent>
+        <CardFooter className="flex justify-center space-x-4">
+          <Button
+            onClick={predictDrawing}
+            disabled={makeDataPredictionMutation.isPending}
+            className="bg-green-500 hover:bg-green-600"
+          >
+            {makeDataPredictionMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Predicting...
+              </>
+            ) : (
+              <>
+                <Pencil className="mr-2 h-4 w-4" />
+                Predict
+              </>
+            )}
+          </Button>
+          <Button onClick={clearCanvas} variant="destructive">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Clear
+          </Button>
+          <Button onClick={() => navigate("/")} variant="outline">
+            <Home className="mr-2 h-4 w-4" />
+            Done
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

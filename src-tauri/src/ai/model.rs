@@ -77,6 +77,9 @@ impl ConvNet {
         image: &Tensor,
         device: &candle_core::Device,
     ) -> candle_core::Result<u32> {
+        // Add batch dimension
+        let image = image.unsqueeze(0)?;
+
         // Forward pass through the model
         let logits = self.forward(&image.to_device(device)?, false)?;
         let label = logits.argmax(D::Minus1)?;

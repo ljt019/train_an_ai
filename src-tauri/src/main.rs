@@ -7,8 +7,10 @@ use image::{GrayImage, ImageBuffer, ImageFormat, Luma};
 use imageproc::filter;
 use std::fs;
 use std::path::Path;
+use tauri::api::path::{data_dir, resource_dir};
 use tauri::command;
 use tauri::InvokeError;
+use tauri::Manager;
 
 mod ai;
 
@@ -18,32 +20,65 @@ use crate::ai::model::TrainingArgs;
 // Define Tauri commands
 
 #[command]
-fn train() {
-    // Create the varmap
-    let mut vm = candle_nn::VarMap::new();
+fn train(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let app_handle_clone = app_handle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        // Create the varmap
+        let mut vm = candle_nn::VarMap::new();
 
-    // Load the model from the file
-    let model = ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors")
-        .expect("Failed to load model");
+        // Load the model from the file
+        let model = match ConvNet::new_from_file(&mut vm, "temp-assets/model.safetensors") {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("Failed to load model: {}", e);
+                app_handle_clone
+                    .emit_all("training_error", e.to_string())
+                    .unwrap_or_else(|err| {
+                        eprintln!("Failed to emit training_error event: {}", err)
+                    });
+                return;
+            }
+        };
 
-    // Load the dataset
-    let dataset = ai::utils::create_dataset().expect("Failed to create dataset");
+        // Load the dataset
+        let dataset = match ai::utils::create_dataset() {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Failed to create dataset: {}", e);
+                app_handle_clone
+                    .emit_all("training_error", e.to_string())
+                    .unwrap_or_else(|err| {
+                        eprintln!("Failed to emit training_error event: {}", err)
+                    });
+                return;
+            }
+        };
 
-    // Create Training Args
-    let args = TrainingArgs {
-        epochs: 1,
-        learning_rate: 0.001,
-        batch_size: 10,
-        save: Some("temp-assets/model.safetensors".to_string()),
-        load: Some("temp-assets/model.safetensors".to_string()),
-    };
+        // Create Training Args
+        let args = TrainingArgs {
+            epochs: 1,
+            learning_rate: 0.01,
+            batch_size: 10,
+            save: Some("temp-assets/model.safetensors".to_string()),
+            load: Some("temp-assets/model.safetensors".to_string()),
+        };
 
-    // Train the model
-    model
-        .train(&dataset, &args, &mut vm)
-        .expect("Failed to train model");
+        // Train the model
+        if let Err(e) = model.train(&dataset, &args, &mut vm) {
+            eprintln!("Failed to train model: {}", e);
+            app_handle_clone
+                .emit_all("training_error", e.to_string())
+                .unwrap_or_else(|err| eprintln!("Failed to emit training_error event: {}", err));
+            return;
+        }
 
-    unimplemented!();
+        // Emit training complete event
+        app_handle_clone
+            .emit_all("training_complete", ())
+            .unwrap_or_else(|err| eprintln!("Failed to emit training_complete event: {}", err));
+    });
+
+    Ok(())
 }
 
 #[command]
@@ -236,7 +271,7 @@ fn apply_pooling_filter() -> Result<String, String> {
     // Create the directory if it doesn't exist
     fs::create_dir_all("processed_drawings").map_err(|e| e.to_string())?;
 
-    // create filename
+    // Create filename
     let pool_filename = "processed_drawings/3_pool.png".to_string();
 
     // Save the processed image
@@ -262,12 +297,12 @@ fn apply_fully_connected_filter() -> Result<String, String> {
     let img = image::open(&image_path).map_err(|e| e.to_string())?;
 
     // Apply brightness increase
-    let bright_img = img.brighten(25); // Increase brightness by 50
+    let bright_img = img.brighten(25); // Increase brightness by 25
 
     // Create the directory if it doesn't exist
     fs::create_dir_all("processed_drawings").map_err(|e| e.to_string())?;
 
-    let fc_filename = "processed_drawings/3_fc.png";
+    let fc_filename = "processed_drawings/3_fc.png".to_string();
 
     // Save the processed image
     bright_img.save(&fc_filename).map_err(|e| e.to_string())?;
@@ -312,36 +347,53 @@ fn max_pooling(img: &GrayImage, pool_size: usize, stride: usize) -> Result<GrayI
 }
 
 #[command]
-fn reset_temp_assets_directory() -> Result<(), String> {
+fn reset_temp_assets_directory(app: tauri::AppHandle) -> Result<(), String> {
+    let package_info = app.package_info();
+    let env = app.env();
+
     println!("Resetting temp-assets directory...");
 
-    let asset_dir = "assets";
-    let temp_asset_dir = "temp-assets";
+    // 1. Get the resource directory (read-only, contains bundled assets)
+    let resource_directory = resource_dir(&package_info, &env)
+        .ok_or_else(|| "Resource directory not found".to_string())?;
 
-    // Remove everything from the temp-assets directory
-    if std::fs::remove_dir_all(temp_asset_dir).is_err() {
+    // 2. Define the path to the model file within resource directory
+    let model_source = resource_directory.join("assets").join("model.safetensors");
+
+    // 3. Check if the model source exists
+    if !model_source.exists() {
+        return Err(format!("Model file not found at {:?}", model_source));
+    }
+
+    // 4. Get the data directory (writable, suitable for temporary assets)
+    let data_directory = data_dir().ok_or_else(|| "Data directory not found".to_string())?;
+
+    // 5. Define the temp-assets directory within data directory
+    let temp_asset_dir = data_directory.join("temp-assets");
+
+    // 6. Remove the temp-assets directory if it exists
+    if std::fs::remove_dir_all(&temp_asset_dir).is_err() {
         println!("Failed to remove temp-assets directory or it does not exist.");
     } else {
         println!("Removed temp-assets directory.");
     }
 
-    // Create the temp-assets directory
-    std::fs::create_dir(temp_asset_dir)
+    // 7. Create the temp-assets directory
+    std::fs::create_dir_all(&temp_asset_dir)
         .map_err(|e| format!("Failed to create temp-assets directory: {}", e))?;
     println!("Created temp-assets directory.");
 
-    // Copy the assets directory to the temp-assets directory
-    for entry in std::fs::read_dir(asset_dir)
-        .map_err(|e| format!("Failed to read assets directory: {}", e))?
-    {
-        let entry =
-            entry.map_err(|e| format!("Failed to read entry in assets directory: {}", e))?;
-        let from = entry.path();
-        let to = Path::new(temp_asset_dir).join(entry.file_name());
-        std::fs::copy(&from, &to)
-            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", from, to, e))?;
-        println!("Copied from {:?} to {:?}", from, to);
-    }
+    // 8. Define the destination path for the model file
+    let model_destination = temp_asset_dir.join("model.safetensors");
+
+    // 9. Copy the model.safetensors file from resources to temp-assets
+    std::fs::copy(&model_source, &model_destination).map_err(|e| {
+        format!(
+            "Failed to copy from {:?} to {:?}: {}",
+            model_source, model_destination, e
+        )
+    })?;
+    println!("Copied from {:?} to {:?}", model_source, model_destination);
 
     Ok(())
 }
