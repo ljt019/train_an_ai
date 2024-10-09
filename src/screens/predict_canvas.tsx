@@ -1,6 +1,7 @@
+// PredictCanvas.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMakeDataPrediction } from "@/hooks/api/backend_hooks";
+import { usePredictFromData } from "@/hooks/api/ai_commands/usePredictFromData";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,15 +9,23 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import { Loader2, Pencil, Trash2, Home } from "lucide-react";
 
 export default function PredictCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [prediction, setPrediction] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const {
+    mutateAsync: predictDrawing,
+    data: prediction,
+    error,
+    isPending,
+    reset,
+  } = usePredictFromData();
+
+  const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -35,8 +44,6 @@ export default function PredictCanvas() {
       }
     }
   }, []);
-
-  const makeDataPredictionMutation = useMakeDataPrediction();
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
@@ -77,27 +84,19 @@ export default function PredictCanvas() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.beginPath();
       }
+      reset();
     }
-    setPrediction(null);
-    setError(null);
   };
 
-  const predictDrawing = async () => {
+  const handlePredictDrawing = async () => {
     const canvas = canvasRef.current;
     if (canvas) {
-      const imageData = canvas.toDataURL("image/png");
-      const base64Data = imageData.split(",").pop() || "";
-
+      const imageDataURL = canvas.toDataURL("image/png");
+      const base64Data = imageDataURL.split(",").pop() || "";
       try {
-        const pred = await makeDataPredictionMutation.mutateAsync({
-          imageData: base64Data,
-        });
-        setPrediction(pred);
-        setError(null);
+        await predictDrawing({ imageData: base64Data });
       } catch (err) {
         console.error("Prediction failed:", err);
-        setError("Failed to get prediction.");
-        setPrediction(null);
       }
     }
   };
@@ -107,8 +106,13 @@ export default function PredictCanvas() {
       <Card className="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-lg animate-fade-in">
         <CardHeader>
           <CardTitle className="text-3xl font-bold text-center">
-            Draw a Symbol for Prediction
+            Get A Prediction!
           </CardTitle>
+          <CardDescription className="text-white/60 text-center text-[1rem]">
+            Draw a number between 0 and 9 on the canvas below and click the
+            predict button to get the prediction from the model you just
+            trained!
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center space-y-4">
           <canvas
@@ -120,20 +124,24 @@ export default function PredictCanvas() {
             className="border-2 border-white rounded-lg shadow-md"
             aria-label="Drawing canvas for prediction"
           />
-          {prediction !== null && (
+          {prediction !== undefined && (
             <p className="text-2xl font-bold animate-fade-in">
               Prediction: {prediction}
             </p>
           )}
-          {error && <p className="text-red-300 animate-fade-in">{error}</p>}
+          {error && (
+            <p className="text-red-300 animate-fade-in">
+              {error.message || "Failed to get prediction."}
+            </p>
+          )}
         </CardContent>
         <CardFooter className="flex justify-center space-x-4">
           <Button
-            onClick={predictDrawing}
-            disabled={makeDataPredictionMutation.isPending}
+            onClick={handlePredictDrawing}
+            disabled={isPending}
             className="bg-green-500 hover:bg-green-600"
           >
-            {makeDataPredictionMutation.isPending ? (
+            {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Predicting...

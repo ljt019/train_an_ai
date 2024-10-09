@@ -20,7 +20,8 @@ export default function ProcessedImage({
   // Trigger mutation on component mount
   useEffect(() => {
     const fetchData = async () => {
-      const data = await mutationFn();
+      let data = await mutationFn();
+      data = `data:image/png;base64,${data}`;
       setProcessedImage(data);
     };
     fetchData();

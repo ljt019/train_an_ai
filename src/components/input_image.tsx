@@ -32,10 +32,12 @@ export default function InputImage({
     );
   }
 
+  const imageSrc = `data:image/png;base64,${data}`;
+
   return (
     <>
       <img
-        src={data}
+        src={imageSrc}
         alt="Input Layer"
         className="rounded-lg mx-auto mb-4 w-64 h-64 object-cover"
       />

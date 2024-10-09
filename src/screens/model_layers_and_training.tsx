@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTrain } from "@/hooks/api/ai_commands/useTrain";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -11,11 +10,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-
-import InputLayer from "./model-layers/input_layer";
-import ConvolutionalLayer from "./model-layers/convolutional_layer";
-import PoolingLayer from "./model-layers/pooling_layer";
-import FullyConnectedLayer from "./model-layers/fully_connected_layer";
+import InputLayer from "@/screens/model-layers/input_layer";
+import ConvolutionalLayer from "@/screens/model-layers/convolutional_layer";
+import PoolingLayer from "@/screens/model-layers/pooling_layer";
+import FullyConnectedLayer from "@/screens/model-layers/fully_connected_layer";
+import { useTrain } from "@/hooks/api/ai_commands/useTrain";
 
 const LAYERS = [
   { component: InputLayer, title: "Input Layer" },
@@ -26,20 +25,47 @@ const LAYERS = [
 
 export default function ModelLayersAndTraining() {
   const [currentLayer, setCurrentLayer] = useState(0);
+  const [trainingProgress, setTrainingProgress] = useState(0);
   const navigate = useNavigate();
 
   const {
     mutate: train,
     isPending: isTraining,
-    isSuccess: trainingSuccess,
-    isError: trainingError,
-    error: trainingErrorMessage,
+    isComplete,
+    error,
   } = useTrain();
 
-  // Trigger training when the component mounts
+  const hasTrainedRef = useRef(false);
+
   useEffect(() => {
-    train();
+    if (!hasTrainedRef.current) {
+      hasTrainedRef.current = true;
+      train();
+    }
   }, [train]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined;
+    if (isTraining && !isComplete) {
+      interval = setInterval(() => {
+        setTrainingProgress((prev) => {
+          if (prev < 99) {
+            const increment = Math.random() * 0.1 + 0.05;
+            return Math.min(prev + increment, 99);
+          }
+          return prev;
+        });
+      }, 100);
+    } else if (isComplete) {
+      setTrainingProgress(100);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isTraining, isComplete]);
 
   const nextLayer = () =>
     setCurrentLayer((prev) => Math.min(prev + 1, LAYERS.length - 1));
@@ -58,7 +84,9 @@ export default function ModelLayersAndTraining() {
       <div className="space-y-8">
         <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
           <CardHeader>
-            <CardTitle className="text-2xl"></CardTitle>
+            <CardTitle className="text-2xl">
+              {LAYERS[currentLayer].title}
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-4">
             <CurrentLayerComponent />
@@ -66,14 +94,14 @@ export default function ModelLayersAndTraining() {
           <CardFooter className="flex justify-between">
             <Button
               onClick={prevLayer}
-              disabled={currentLayer === 0 || isTraining}
+              disabled={currentLayer === 0}
               className="bg-white text-black border-none hover:bg-gray-200"
             >
               <ChevronLeft className="mr-2 h-4 w-4" /> Previous Layer
             </Button>
             <Button
               onClick={nextLayer}
-              disabled={currentLayer === LAYERS.length - 1 || isTraining}
+              disabled={currentLayer === LAYERS.length - 1}
               className="bg-white text-black border-none hover:bg-gray-200"
             >
               Next Layer <ChevronRight className="ml-2 h-4 w-4" />
@@ -86,41 +114,46 @@ export default function ModelLayersAndTraining() {
             <CardTitle className="text-2xl">Training Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-4">
-            {isTraining && (
-              <div className="w-full">
-                <div className="flex items-center justify-between mb-2">
+            <div className="w-full">
+              <div className="flex items-center justify-between mb-2">
+                {isTraining && !isComplete ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Training in progress...</span>
-                  <span>Loading...</span>
-                </div>
-                <Progress
-                  className="w-full rounded-full h-2.5"
-                  value={undefined} // Indeterminate progress
-                />
+                ) : (
+                  <div className="h-5 w-5" />
+                )}
+                <span>
+                  {isComplete
+                    ? "Training complete!"
+                    : isTraining
+                    ? "Training in progress..."
+                    : "Training not started"}
+                </span>
+                <span>{trainingProgress.toFixed(2)}%</span>
               </div>
-            )}
-            {trainingSuccess && (
-              <div className="p-4 bg-green-500/20 text-green-100 rounded w-full text-center">
-                Training completed successfully!
-              </div>
-            )}
-            {trainingError && (
+              <Progress
+                className="w-full rounded-full h-2.5"
+                value={trainingProgress}
+              />
+            </div>
+            {error && (
               <div className="p-4 bg-red-500/20 text-red-100 rounded w-full text-center">
-                {trainingErrorMessage || "Training failed. Please try again."}
+                {error}
               </div>
             )}
           </CardContent>
           <CardFooter className="flex justify-center">
             <Button
               onClick={() => navigate("/predict_canvas")}
-              disabled={!trainingSuccess || !allLayersViewed}
+              disabled={!allLayersViewed || !isComplete}
               className="w-full max-w-xs bg-white text-black border-none hover:bg-gray-200"
             >
-              {trainingSuccess && allLayersViewed
-                ? "Start Predicting"
-                : trainingSuccess
+              {!isComplete
+                ? "Training in Progress..."
+                : !allLayersViewed
                 ? "View All Layers to Continue"
-                : "Training in Progress..."}
+                : !isComplete
+                ? "Waiting for Training to Complete"
+                : "Start Predicting"}
             </Button>
           </CardFooter>
         </Card>

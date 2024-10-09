@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSaveDrawing } from "@/hooks/api/backend_hooks";
+import { useSaveDrawing } from "@/hooks/api/image_commands/useSaveDrawing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
