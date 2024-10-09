@@ -1,25 +1,9 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProcessedImage from "@/components/processed_image";
+import { useApplyConvFilter } from "@/hooks/api/image_commands/useApplyConvFilter";
 
 export default function ConvolutionalLayer() {
-  const [processedImage, setProcessedImage] = useState<string>("");
-  const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
-
-  useEffect(() => {
-    const processImage = async () => {
-      try {
-        const base64Data: string = await invoke("apply_conv_filter");
-        setProcessedImage(`data:image/png;base64,${base64Data}`);
-      } catch (error) {
-        console.error("Error processing convolutional layer:", error);
-        setErrorOccurred(true);
-      }
-    };
-
-    processImage();
-  }, []);
+  const { mutateAsync, isPending, isError, error } = useApplyConvFilter();
 
   return (
     <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
@@ -43,8 +27,10 @@ export default function ConvolutionalLayer() {
           feature maps.
         </p>
         <ProcessedImage
-          processedImage={processedImage}
-          errorOccurred={errorOccurred}
+          mutationFn={mutateAsync}
+          isPending={isPending}
+          isError={isError}
+          error={error}
         />
       </CardContent>
     </Card>

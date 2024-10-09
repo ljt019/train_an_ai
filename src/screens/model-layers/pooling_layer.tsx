@@ -1,25 +1,9 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProcessedImage from "@/components/processed_image";
+import { useApplyPoolingFilter } from "@/hooks/api/image_commands/useGetPoolingFilterImage";
 
 export default function PoolingLayer() {
-  const [processedImage, setProcessedImage] = useState<string>("");
-  const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
-
-  useEffect(() => {
-    const processImage = async () => {
-      try {
-        const base64Data: string = await invoke("apply_pooling_filter");
-        setProcessedImage(`data:image/png;base64,${base64Data}`);
-      } catch (error) {
-        console.error("Error processing pooling layer:", error);
-        setErrorOccurred(true);
-      }
-    };
-
-    processImage();
-  }, []);
+  const { mutateAsync, isPending, isError, error } = useApplyPoolingFilter();
 
   return (
     <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
@@ -40,8 +24,10 @@ export default function PoolingLayer() {
           from each window.
         </p>
         <ProcessedImage
-          processedImage={processedImage}
-          errorOccurred={errorOccurred}
+          mutationFn={mutateAsync}
+          isPending={isPending}
+          isError={isError}
+          error={error}
         />
       </CardContent>
     </Card>

@@ -1,17 +1,17 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api";
 import { Button } from "@/components/ui/button";
 import { Brain, Cpu, Network } from "lucide-react";
+import { useResetTempAssetsDirectory } from "@/hooks/api/file_commands/useResetTempAssetsDirectory";
 
 export default function Index() {
   const navigate = useNavigate();
 
+  const { mutate: resetTempAssetsDirectory } = useResetTempAssetsDirectory();
+
   useEffect(() => {
-    invoke("reset_temp_assets_directory").then((data) => {
-      console.log(data);
-    });
-  }, []);
+    resetTempAssetsDirectory();
+  }, [resetTempAssetsDirectory]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-700 to-blue-500 text-white">

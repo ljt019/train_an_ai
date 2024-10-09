@@ -1,25 +1,9 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import ProcessedImage from "@/components/processed_image";
+import InputImage from "@/components/input_image";
+import { useGetInputImage } from "@/hooks/api/image_commands/useGetInputImage";
 
 export default function InputLayer() {
-  const [inputImage, setInputImage] = useState<string>("");
-  const [errorOccurred, setErrorOccurred] = useState<boolean>(false);
-
-  useEffect(() => {
-    const fetchInputImage = async () => {
-      try {
-        const base64Data: string = await invoke("get_input_image");
-        setInputImage(`data:image/png;base64,${base64Data}`);
-      } catch (error) {
-        console.error("Error fetching input image:", error);
-        setErrorOccurred(true);
-      }
-    };
-
-    fetchInputImage();
-  }, []);
+  const { data, isLoading, isError, error } = useGetInputImage();
 
   return (
     <Card className="w-full bg-white/10 backdrop-blur-lg animate-fade-in">
@@ -38,9 +22,11 @@ export default function InputLayer() {
           (28 * 28) input neurons. The brightness of each pixel is represented
           as a number between 0 (black) and 255 (white).
         </p>
-        <ProcessedImage
-          processedImage={inputImage}
-          errorOccurred={errorOccurred}
+        <InputImage
+          data={data}
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
         />
       </CardContent>
     </Card>
