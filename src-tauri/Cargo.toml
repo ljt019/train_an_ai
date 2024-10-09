@@ -15,12 +15,9 @@ tauri = { version = "1", features = [ "fs-all", "shell-open"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.13"
-chrono = "0.4"
 image = "0.24"
 candle-nn = "0.7.0"
 candle-core = "0.7.0"
-mnist = "0.6.0"
-ndarray = "0.16.1"
 imageproc = "0.23"
 candle-datasets = "0.7.2"
 rand = "0.8.5"

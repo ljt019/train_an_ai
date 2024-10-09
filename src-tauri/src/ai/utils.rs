@@ -1,7 +1,6 @@
-use candle_core::{DType, Tensor, D};
+use candle_core::Tensor;
 use candle_datasets;
-use candle_nn::{loss, ops};
-use image::{DynamicImage, GrayImage};
+use image::DynamicImage;
 use std::path::PathBuf;
 
 pub fn image_path_to_formatted_tensor(
