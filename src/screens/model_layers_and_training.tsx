@@ -12,14 +12,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import {
-  ConvolutionalLayer,
-  FullyConnectedLayer,
-  InputLayer,
-  PoolingLayer,
-} from "./model-layers/layers";
 
-const IMAGE_PATH = "../../../src-tauri/drawings/3.png";
+import InputLayer from "./model-layers/input_layer";
+import ConvolutionalLayer from "./model-layers/convolutional_layer";
+import PoolingLayer from "./model-layers/pooling_layer";
+import FullyConnectedLayer from "./model-layers/fully_connected_layer";
+
 const LAYERS = [
   { component: InputLayer, title: "Input Layer" },
   { component: ConvolutionalLayer, title: "Convolutional Layer" },
