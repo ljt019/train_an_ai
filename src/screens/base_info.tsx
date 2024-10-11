@@ -16,6 +16,25 @@ export default function BaseInfo() {
         <Card className="bg-white/10 backdrop-blur-lg animate-fade-in">
           <CardHeader>
             <CardTitle className="flex items-center text-2xl">
+              <Pencil className="mr-2" /> Your Role in Training
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              In the next step, you'll be asked to draw the numbers 1-9. These
+              drawings will be used to train a Convolutional Neural Network
+              (CNN) model. As your drawings pass through the layers of the CNN,
+              the model will learn to recognize the numbers you draw and be able
+              to identify similar numbers in the future. Once training is
+              complete, you'll be able to draw more numbers and see the AI
+              predict what you've drawn—all thanks to your drawings.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/10 backdrop-blur-lg animate-fade-in">
+          <CardHeader>
+            <CardTitle className="flex items-center text-2xl">
               <Brain className="mr-2" /> What is a CNN?
             </CardTitle>
           </CardHeader>
@@ -52,23 +71,12 @@ export default function BaseInfo() {
             </div>
             <p className="mt-4">
               Each layer learns to detect different features of an image, from
-              simple edges to complex shapes.
+              simple edges to complex shapes. We will learn more about these
+              while we wait for the ai model to train.
             </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/10 backdrop-blur-lg animate-fade-in">
-          <CardHeader>
-            <CardTitle className="flex items-center text-2xl">
-              <Pencil className="mr-2" /> Your Role in Training
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>
-              In the next step, you'll be asked to draw numbers. These drawings
-              will be used to train our CNN. By providing diverse examples,
-              you're helping the AI learn to recognize numbers in different
-              styles and handwritings.
+            <p className="mt-4 text-sm text-gray-300">
+              Note: The model we will be training has 3 convolutional layers, 3
+              pooling layers, and 2 fully connected layers.
             </p>
           </CardContent>
         </Card>

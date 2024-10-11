@@ -2,7 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSaveDrawing } from "@/hooks/api/image_commands/useSaveDrawing";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Pencil } from "lucide-react";
 
@@ -99,6 +105,10 @@ export default function CollectData() {
           <CardTitle className="text-3xl font-bold text-center flex items-center justify-center">
             <Pencil className="mr-2" /> Draw {symbols[currentSymbol]}
           </CardTitle>
+          <CardDescription className="text-center  text-gray-300">
+            Draw the number {symbols[currentSymbol]} in the canvas below, so it
+            can be used to train a Convolutional Neural Network
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center space-y-6">
           <canvas
@@ -112,7 +122,9 @@ export default function CollectData() {
           />
           <Button
             onClick={saveDrawing}
-            className="w-full max-w-xs text-lg px-6 py-3 bg-white text-purple-700 hover:bg-purple-100 transition-all duration-800 animate-slow-bounce"
+            className={`w-full max-w-xs text-lg px-6 py-3 bg-white hover:bg-purple-100 transition-all text-purple-700  ${
+              isLastDrawing ? "duration-800 animate-slow-bounce" : ""
+            }`}
             disabled={saveDrawingMutation.isPending}
           >
             {saveDrawingMutation.isPending ? (

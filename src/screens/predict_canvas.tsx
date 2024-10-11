@@ -109,9 +109,8 @@ export default function PredictCanvas() {
             Get A Prediction!
           </CardTitle>
           <CardDescription className="text-white/60 text-center text-[1rem]">
-            Draw a number between 0 and 9 on the canvas below and click the
-            predict button to get the prediction from the model you just
-            trained!
+            Draw a number between 0 and 9 on the canvas below, then click the
+            predict button to see what the model thinks you drew!
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center space-y-4">
@@ -124,9 +123,13 @@ export default function PredictCanvas() {
             className="border-2 border-white rounded-lg shadow-md"
             aria-label="Drawing canvas for prediction"
           />
-          {prediction !== undefined && (
+          {prediction !== undefined ? (
             <p className="text-2xl font-bold animate-fade-in">
-              Prediction: {prediction}
+              Your model guesses: {prediction}
+            </p>
+          ) : (
+            <p className="text-2xl font-bold animate-fade-in">
+              Your model guesses: ?
             </p>
           )}
           {error && (
@@ -139,7 +142,7 @@ export default function PredictCanvas() {
           <Button
             onClick={handlePredictDrawing}
             disabled={isPending}
-            className="bg-green-500 hover:bg-green-600"
+            className="bg-green-800 hover:bg-green-900 text-white"
           >
             {isPending ? (
               <>
